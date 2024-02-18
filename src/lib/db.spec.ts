@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { initializeDB, searchInDB, createWordObject } from './db';
+import 'fake-indexeddb/auto';
 
 describe('All my DB tests', () => {
   test('it should return expected word objects', () => {
-    let testWords: string[] = ['four', 'five', 'love'];
+    const testWords = ['four', 'five', 'love'];
 
     expect(createWordObject(testWords[0])).toEqual({
       firstLetter: 'f',

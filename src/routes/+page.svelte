@@ -1,10 +1,10 @@
 <script>
-  import { Block, Navbar, Page } from 'konsta/svelte';
+  import { base } from '$app/paths';
 </script>
 
-<Page>
-  <Navbar title="Coco Word" />
-  <Block strong>
-    <p>Everything to do now !</p>
-  </Block>
-</Page>
+<div class="flex flex-col justify-center items-center w-full space-y-6">
+  <div class="max-w-lg">
+    <enhanced:img src="./coco-background.png" alt="Background of the game" />
+  </div>
+  <a class="btn btn-primary min-w-36" href="{base}/play">Play</a>
+</div>

@@ -1,8 +1,12 @@
 <script>
+  import { base } from '$app/paths';
   import '../app.css';
-  import { App } from 'konsta/svelte';
+  import '@fontsource-variable/oswald';
 </script>
 
-<App theme="ios">
-  <slot />
-</App>
+<div class="navbar bg-primary text-primary-content">
+  <div class="flex-1">
+    <a class="btn btn-ghost text-xl" href="{base}/">Coco Word</a>
+  </div>
+</div>
+<slot />

@@ -1,4 +1,4 @@
-import type { Letter } from './letter';
+import type { Letter } from './types/letter';
 
 const dbName = 'dictionary';
 const keyList = [
@@ -60,6 +60,10 @@ export function initializeDB(words: string[]) {
       });
     };
   };
+}
+
+export function isValidWord(word: string): boolean {
+  return false;
 }
 
 export function searchInDB(searchParams: {
