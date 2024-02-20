@@ -35,10 +35,16 @@ describe('All my DB tests', () => {
     expect(createWordObject(testWords[1])).toBeNull();
   });
 
-  test('it should search by first letter', () => {
-    initializeDB(['four', 'five', 'love']);
-    expect(searchInDB({ searchLetters: [{ letter: 'f', position: 0 }] })).toEqual(['four', 'five']);
-    expect(searchInDB({ searchLetters: [{ letter: 'v', position: 2 }] })).toEqual(['five', 'love']);
-    expect(searchInDB({ searchLetters: [{ letter: 'a', position: 0 }] })).toEqual([]);
+  test('it should search by first letter', async () => {
+    await initializeDB(['four', 'five', 'love']);
+    expect(await searchInDB({ searchLetters: [{ letter: 'f', position: 0 }] })).toEqual([
+      'four',
+      'five'
+    ]);
+    expect(await searchInDB({ searchLetters: [{ letter: 'v', position: 2 }] })).toEqual([
+      'five',
+      'love'
+    ]);
+    expect(await searchInDB({ searchLetters: [{ letter: 'a', position: 0 }] })).toEqual([]);
   });
 });
