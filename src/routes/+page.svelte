@@ -1,5 +1,11 @@
 <script>
   import { base } from '$app/paths';
+  import { addWordToDB } from '$lib/db';
+  import { onMount } from 'svelte';
+
+  onMount(() => {
+    addWordToDB(['four', 'five', 'love']);
+  });
 </script>
 
 <div class="flex flex-col justify-center items-center w-full space-y-6">

@@ -1,3 +1,4 @@
+import Dexie, { type Table } from 'dexie';
 import type { Letter } from './types/letter';
 
 const dbName = 'dictionary';
@@ -11,134 +12,118 @@ const keyList = [
   'seventhLetter'
 ];
 
+export interface Word {
+  id?: number;
+  firstLetter: string;
+  secondLetter: string;
+  thirdLetter: string;
+  fourthLetter: string;
+  fifthLetter: string;
+  sixthLetter: string;
+  seventhLetter: string;
+}
+
 const mapPositionToKey = (position: number) => keyList[position];
 
 const minWordLength = 4;
 const maxWordLength = 7;
 
-let db: IDBDatabase;
+export class myDexie extends Dexie {
+  words!: Table<Word>;
 
-// the setup of IndexDB, and the methods to use it.
-export async function initializeDB(words: string[]): Promise<void> {
-  if (db) {
-    db.close();
-  }
-  // add wordObject to the database
-  const request = indexedDB.open(dbName, 2);
-
-  return new Promise((resolve, reject) => {
-    request.onerror = (event) => {
-      // Handle errors.
-      reject(event);
-    };
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest)?.result;
-
-      if (!db) return;
-
-      // Create an objectStore to hold information about the words.
-      const objectStore = db.createObjectStore('words', { autoIncrement: true });
-
-      // Create index for each position in the word and for each combination of positions.
-      for (let i = 0; i < maxWordLength; i++) {
-        objectStore.createIndex(keyList[i], keyList[i], { unique: false });
-
-        for (let j = i + 1; j < maxWordLength; j++) {
-          let indexes = [];
-
-          for (let k = i; k <= j; k++) {
-            indexes.push(keyList[k]);
-          }
-
-          objectStore.createIndex(indexes.join(', '), indexes, { unique: false });
-        }
-      }
-
-      // Store values in the newly created objectStore.
-      objectStore.transaction.oncomplete = () => {
-        const wordObjectStore = db.transaction('words', 'readwrite').objectStore('words');
-        words.forEach((word) => {
-          const wordObject = createWordObject(word);
-          if (wordObject) wordObjectStore.add(wordObject);
-        });
-      };
-    };
-    request.onsuccess = () => {
-      db = request.result;
-      resolve();
-    };
-  });
-}
-
-export async function isValidWord(word: string): Promise<boolean> {
-  if (isWordLengthValid(word)) {
-    const result = await searchInDB({
-      searchLetters: word
-        .split('')
-        .map((letter, index) => ({ letter: letter as Letter, position: index }))
+  constructor() {
+    super(dbName);
+    this.version(1).stores({
+      words: `++id, 
+              firstLetter, 
+              secondLetter, 
+              thirdLetter, 
+              fourthLetter, 
+              fifthLetter, 
+              sixthLetter, 
+              seventhLetter, 
+              [firstLetter+secondLetter], 
+              [firstLetter+thirdLetter],
+              [firstLetter+fourthLetter],
+              [firstLetter+fifthLetter],
+              [firstLetter+sixthLetter],
+              [firstLetter+seventhLetter],
+              [firstLetter+secondLetter+thirdLetter],
+              [firstLetter+secondLetter+fourthLetter],
+              [firstLetter+secondLetter+fifthLetter],
+              [firstLetter+secondLetter+sixthLetter],
+              [firstLetter+secondLetter+seventhLetter]`
     });
-
-    if (result.length > 0) {
-      return true;
-    }
   }
-  return false;
 }
 
-export function searchInDB(searchParams: {
-  maxLength?: number;
-  searchLetters: { letter: Letter; position: number }[];
-}): Promise<string[]> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, 2);
-    db.onerror = (event) => {
-      reject(event);
-    };
-
-    request.onsuccess = (event) => {
-      const db = (event.target as IDBOpenDBRequest)?.result;
-
-      if (!db) return [];
-
-      const wordObjectStore = db.transaction('words', 'readonly').objectStore('words');
-      let indexes = [];
-      let values = [];
-      for (const searchLetter of searchParams.searchLetters) {
-        indexes.push(mapPositionToKey(searchLetter.position));
-        values.push(searchLetter.letter);
-      }
-
-      const index = wordObjectStore.index(indexes.join(', '));
-      const indexRequest = index.getAll(values.length > 1 ? values : values[0]);
-
-      indexRequest.onsuccess = (event) => {
-        const wordObjects = (event.target as IDBRequest)?.result;
-        db.close();
-        resolve(
-          wordObjects.map((wordObject: { [x: string]: string }) =>
-            keyList
-              .map((key) => wordObject[key])
-              .filter((val) => val)
-              .join('')
-          )
-        );
-      };
-    };
-  });
-}
-
-export function createWordObject(word: string): any {
-  if (isWordLengthValid(word)) {
-    let wordObject: Record<string, string> = {};
-    for (let i = 0; i < word.length; i++) {
-      wordObject[keyList[i]] = word[i];
-    }
-    return wordObject;
-  }
-  return null;
-}
+export const db = new myDexie();
 
 export function isWordLengthValid(word: string): boolean {
   return word.length >= minWordLength && word.length <= maxWordLength;
+}
+
+export function createWordObject(word: string): Word | null {
+  if (isWordLengthValid(word)) {
+    let wordObject: Word = {
+      firstLetter: '',
+      secondLetter: '',
+      thirdLetter: '',
+      fourthLetter: '',
+      fifthLetter: '',
+      sixthLetter: '',
+      seventhLetter: ''
+    };
+    wordObject.firstLetter = word[0];
+    wordObject.secondLetter = word[1];
+    wordObject.thirdLetter = word[2];
+    wordObject.fourthLetter = word[3];
+    wordObject.fifthLetter = word[4] || '';
+    wordObject.sixthLetter = word[5] || '';
+    wordObject.seventhLetter = word[6] || '';
+
+    return wordObject;
+  }
+
+  return null;
+}
+
+export async function addWordToDB(words: string[]) {
+  var wordObjects: Word[] = [];
+  words.forEach((word) => {
+    var wordObject = createWordObject(word);
+    if (wordObject) wordObjects.push(wordObject);
+  });
+
+  try {
+    await db.words.bulkAdd(wordObjects);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export async function searchInDB(searchParams: {
+  maxLength?: number;
+  searchLetters: { letter: Letter; position: number }[];
+}): Promise<string[]> {
+  let indexes = [];
+  let values = [];
+  for (const searchLetter of searchParams.searchLetters) {
+    indexes.push(mapPositionToKey(searchLetter.position));
+    values.push(searchLetter.letter);
+  }
+
+  let searchResult = await db.words.where(indexes.join('+')).equals(values.join('+')).toArray();
+
+  return searchResult.map((wordObject: Word) => {
+    return (
+      wordObject.firstLetter +
+      wordObject.secondLetter +
+      wordObject.thirdLetter +
+      wordObject.fourthLetter +
+      wordObject.fifthLetter +
+      wordObject.sixthLetter +
+      wordObject.seventhLetter
+    );
+  });
 }
