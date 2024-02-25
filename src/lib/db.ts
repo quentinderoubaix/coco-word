@@ -19,7 +19,7 @@ const maxWordLength = 7;
 let db: IDBDatabase;
 
 // the setup of IndexDB, and the methods to use it.
-export function initializeDB(words: string[]): Promise<void> {
+export async function initializeDB(words: string[]): Promise<void> {
   if (db) {
     db.close();
   }

@@ -1,12 +1,5 @@
 <script>
   import { base } from '$app/paths';
-  import { initializeDB, searchInDB } from '$lib/db';
-  import { onMount } from 'svelte';
-
-  onMount(() => {
-    initializeDB(['four', 'five', 'love']);
-    searchInDB({ searchLetters: [{ letter: 'f', position: 0 }] });
-  });
 </script>
 
 <div class="flex flex-col justify-center items-center w-full space-y-6">

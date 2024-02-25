@@ -66,6 +66,7 @@ interface EditableSpot {
   from: number;
   to: number;
   cell: Cell;
+  nbLetters: number;
 }
 
 function canCreateEditable(cell: Cell): false | EditableSpot {
@@ -76,6 +77,7 @@ function canCreateEditable(cell: Cell): false | EditableSpot {
     if (cell.neighboors[1][0]?.letter() || cell.neighboors[1][1]?.letter()) {
       return false;
     }
+    let nbLetters = 1;
     let from = 0;
     let walkCell = cell;
     while (
@@ -85,6 +87,9 @@ function canCreateEditable(cell: Cell): false | EditableSpot {
       !walkCell.neighboors[1][0].neighboors[0][0]?.letter() &&
       !walkCell.neighboors[1][0].neighboors[0][1]?.letter()
     ) {
+      if (walkCell.neighboors[1][0].letter()) {
+        nbLetters++;
+      }
       walkCell = walkCell.neighboors[1][0];
       from--;
     }
@@ -97,11 +102,14 @@ function canCreateEditable(cell: Cell): false | EditableSpot {
       !walkCell.neighboors[1][1].neighboors[0][0]?.letter() &&
       !walkCell.neighboors[1][1].neighboors[0][1]?.letter()
     ) {
+      if (walkCell.neighboors[1][1].letter()) {
+        nbLetters++;
+      }
       walkCell = walkCell.neighboors[1][1];
       to++;
     }
     if (to - from >= 3) {
-      return { direction: 'vertical', from, to, cell };
+      return { direction: 'vertical', from, to, cell, nbLetters };
     } else {
       return false;
     }
@@ -110,6 +118,7 @@ function canCreateEditable(cell: Cell): false | EditableSpot {
     if (cell.neighboors[0][0]?.letter() || cell.neighboors[0][1]?.letter()) {
       return false;
     }
+    let nbLetters = 1;
     let from = 0;
     let walkCell = cell;
     while (
@@ -119,6 +128,9 @@ function canCreateEditable(cell: Cell): false | EditableSpot {
       !walkCell.neighboors[0][0].neighboors[1][0]?.letter() &&
       !walkCell.neighboors[0][0].neighboors[1][1]?.letter()
     ) {
+      if (walkCell.neighboors[0][0].letter()) {
+        nbLetters++;
+      }
       walkCell = walkCell.neighboors[0][0];
       from--;
     }
@@ -131,32 +143,38 @@ function canCreateEditable(cell: Cell): false | EditableSpot {
       !walkCell.neighboors[0][1].neighboors[1][0]?.letter() &&
       !walkCell.neighboors[0][1].neighboors[1][1]?.letter()
     ) {
+      if (walkCell.neighboors[0][1].letter()) {
+        nbLetters++;
+      }
       walkCell = walkCell.neighboors[0][1];
       to++;
     }
     if (to - from >= 3) {
-      return { direction: 'horizontal', from, to, cell };
+      return { direction: 'horizontal', from, to, cell, nbLetters };
     } else {
       return false;
     }
   }
 }
 
-export function completeWord(force = false) {
+export async function canUseEditable(editable: EditableSpot): Promise<EditableWord | undefined> {
+  return undefined;
+}
+
+export async function completeWord(force = false): Promise<void> {
   const editableWord = selectedEditable();
   if (editableWord && (force || editableWord.isValid())) {
-    batch(() => {
-      const forNewEdits = useableForNewEditable();
-      for (const cell of editableWord.cells) {
-        if (!cell.letter()) {
-          cell.letter.set(cell.tempLetter());
-          forNewEdits.push(cell);
-        }
+    const forNewEdits = useableForNewEditable();
+    for (const cell of editableWord.cells) {
+      if (!cell.letter()) {
+        cell.letter.set(cell.tempLetter());
+        forNewEdits.push(cell);
       }
-      selectedEditable.set(undefined);
+    }
 
-      const editableSpots: EditableSpot[] = [];
-      const updatedUseableForNewEditable: Cell[] = [];
+    const editableSpots: EditableSpot[] = [];
+    let updatedUseableForNewEditable: Cell[] = [];
+    batch(() => {
       for (const cell of forNewEdits) {
         const editableSpot = canCreateEditable(cell);
         if (editableSpot) {
@@ -164,13 +182,56 @@ export function completeWord(force = false) {
           editableSpots.push(editableSpot);
         }
       }
+    });
+
+    //useableForNewEditable.set(updatedUseableForNewEditable);
+    editableSpots.sort((a, b) => (b.nbLetters - a.nbLetters) * 2 + Math.random());
+    const toExclude = new Set<Cell>();
+    let index = 0;
+    // choose first possible editable spot
+    let firstEditable: EditableWord | undefined = undefined;
+    let firstSpot: EditableSpot | undefined = undefined;
+    while (index < editableSpots.length && !firstEditable) {
+      const testingEditable = editableSpots[index];
+      firstEditable = await canUseEditable(testingEditable);
+      if (firstEditable) {
+        firstSpot = testingEditable;
+      } else {
+        toExclude.add(testingEditable.cell);
+      }
+      index++;
+    }
+    // choose second possible editable, filering all spots with the origin cell being in the same row or column as the origin cell of the first spot
+    let secondEditable: EditableWord | undefined = undefined;
+    while (index < editableSpots.length && !firstEditable) {
+      const testingEditable = editableSpots[index];
+      if (
+        (testingEditable.cell.x === firstSpot!.cell.x &&
+          (testingEditable.direction === 'vertical' || firstSpot!.direction === 'vertical')) ||
+        (testingEditable.cell.y === firstSpot!.cell.y &&
+          (testingEditable.direction === 'horizontal' || firstSpot!.direction === 'horizontal'))
+      ) {
+        continue;
+      }
+      secondEditable = await canUseEditable(testingEditable);
+      if (!secondEditable) {
+        toExclude.add(testingEditable.cell);
+      }
+      index++;
+    }
+
+    updatedUseableForNewEditable = updatedUseableForNewEditable.filter(
+      (cell) => !toExclude.has(cell)
+    );
+    batch(() => {
       useableForNewEditable.set(updatedUseableForNewEditable);
-
-      // TODO => logic to find spot to use between the list of spots
-      console.log(`Found spots to use ${editableSpots.length}`);
-
+      selectedEditable.set(undefined);
       // TODO => logic to create two editable words
-      editableWords.set([]);
+      if (firstEditable && secondEditable) {
+        editableWords.set([firstEditable, secondEditable]);
+      } else {
+        // TODO end of level
+      }
     });
   }
 }
